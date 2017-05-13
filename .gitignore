@@ -1,5 +1,6 @@
 # Custom
 build
+test/img_out/lena_blur.png
 
 # Created by https://www.gitignore.io/api/c,osx,windows,linux
 
