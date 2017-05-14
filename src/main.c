@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "../lib/imagelib/imagelib.h"
 
@@ -55,16 +56,48 @@ int main(int argc, char *argv[]) {
         size_t k_width = 0;
         float **K = read_kernel(kernel_path, &k_height, &k_width);
 
-        Image *img = img_png_read_from_file(img_in_path);
-        for (int row = 0; row < img->height; row++) {
-                for (int col = 0; col < img->width; col++) {
-                        img->pixels[row][col].R = 0;
-                        img->pixels[row][col].G = 0;
-                        img->pixels[row][col].B = 0;
+        size_t k_width_center = floor(k_width / 2);
+        size_t k_height_center = floor(k_height / 2);
+        size_t k_width_radius = k_width - k_width_center - 1;
+        size_t k_height_radius = k_height - k_height_center - 1;
+
+        Image *src = img_png_read_from_file(img_in_path);
+        Image *out = img_png_read_from_file(img_in_path);
+        for (size_t row = 0; row < src->height; row++) {
+                for (size_t col = 0; col < src->width; col++) {
+                        Color *acc = malloc(sizeof(Color));
+
+                        size_t i = 0;
+                        for (ssize_t row_start = row - k_width_radius; row_start <= row + k_width_radius; row_start++) {
+                                size_t j = 0;
+                                for (ssize_t col_start = col - k_height_radius; col_start <= col + k_height_radius; col_start++) {
+                                        if (row_start < 0 || row_start >= src->width) {
+                                                continue;
+                                        }
+                                        else if (col_start < 0 || col_start >= src->height) {
+                                                continue;
+                                        }
+                                        else {
+                                                float K_ij = K[i][j];
+                                                Color I_ij = src->pixels[row][col];
+                                                acc->R = K_ij * I_ij.R;
+                                                acc->G = K_ij * I_ij.G;
+                                                acc->B = K_ij * I_ij.B;
+                                        }
+                                        j += 1;
+                                }
+                                i += 1;
+                        }
+                        size_t sum = k_width * k_height;
+                        out->pixels[row][col].R = acc->R / sum;
+                        out->pixels[row][col].G = acc->G / sum;
+                        out->pixels[row][col].B = acc->B / sum;
                 }
         }
-        img_png_write_to_file(img, img_out_path);
-        img_destroy(img);
+        img_png_write_to_file(out, img_out_path);
+
+        img_destroy(out);
+        img_destroy(src);
 
         return 0;
 }
