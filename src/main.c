@@ -47,10 +47,27 @@ float **read_kernel(char *kernel_path, size_t *H, size_t *W) {
         return K;
 }
 
+Image *create_image(size_t height, size_t width) {
+        Image *img = malloc(sizeof(Image));
+        img->width = width;
+        img->height = height;
+        img->pixels = calloc(height, sizeof(Color *));
+        for (size_t row = 0; row < height; row++) {
+                img->pixels[row] = calloc(width, sizeof(Color));
+                for (size_t col = 0; col < width; col++) {
+                        img->pixels[row][col].R = 0.0;
+                        img->pixels[row][col].G = 0.0;
+                        img->pixels[row][col].B = 0.0;
+                }
+        }
+        return img;
+}
+
 int main(int argc, char *argv[]) {
         char *img_in_path = argv[1];
         char *kernel_path = argv[2];
-        char *img_out_path = argv[3];
+        size_t passes = atoi(argv[3]);
+        char *img_out_path = argv[4];
 
         size_t k_height = 0;
         size_t k_width = 0;
@@ -62,42 +79,50 @@ int main(int argc, char *argv[]) {
         size_t k_height_radius = k_height - k_height_center - 1;
 
         Image *src = img_png_read_from_file(img_in_path);
-        Image *out = img_png_read_from_file(img_in_path);
-        for (size_t row = 0; row < src->height; row++) {
-                for (size_t col = 0; col < src->width; col++) {
-                        Color *acc = malloc(sizeof(Color));
+        Image *out = NULL;
 
-                        size_t i = 0;
-                        for (ssize_t row_start = row - k_width_radius; row_start <= row + k_width_radius; row_start++) {
-                                size_t j = 0;
-                                for (ssize_t col_start = col - k_height_radius; col_start <= col + k_height_radius; col_start++) {
-                                        if (row_start < 0 || row_start >= src->width) {
-                                                continue;
+        for (size_t pass = 0; pass < passes; pass++) {
+                out = create_image(src->height, src->width);
+
+                for (size_t row = 0; row < src->height; row++) {
+                        for (size_t col = 0; col < src->width; col++) {
+                                Color *acc = malloc(sizeof(Color));
+
+                                size_t i = 0;
+                                for (ssize_t row_start = row - k_width_radius; row_start <= row + k_width_radius; row_start++) {
+                                        size_t j = 0;
+                                        for (ssize_t col_start = col - k_height_radius; col_start <= col + k_height_radius; col_start++) {
+                                                if (row_start < 0 || row_start >= src->width) {
+                                                        continue;
+                                                }
+                                                else if (col_start < 0 || col_start >= src->height) {
+                                                        continue;
+                                                }
+                                                else {
+                                                        float K_ij = K[i][j];
+                                                        Color I_ij = src->pixels[row][col];
+                                                        acc->R = K_ij * I_ij.R;
+                                                        acc->G = K_ij * I_ij.G;
+                                                        acc->B = K_ij * I_ij.B;
+                                                }
+                                                j += 1;
                                         }
-                                        else if (col_start < 0 || col_start >= src->height) {
-                                                continue;
-                                        }
-                                        else {
-                                                float K_ij = K[i][j];
-                                                Color I_ij = src->pixels[row][col];
-                                                acc->R = K_ij * I_ij.R;
-                                                acc->G = K_ij * I_ij.G;
-                                                acc->B = K_ij * I_ij.B;
-                                        }
-                                        j += 1;
+                                        i += 1;
                                 }
-                                i += 1;
+                                size_t sum = k_width * k_height;
+                                out->pixels[row][col].R = acc->R / sum;
+                                out->pixels[row][col].G = acc->G / sum;
+                                out->pixels[row][col].B = acc->B / sum;
+                                free(acc);
                         }
-                        size_t sum = k_width * k_height;
-                        out->pixels[row][col].R = acc->R / sum;
-                        out->pixels[row][col].G = acc->G / sum;
-                        out->pixels[row][col].B = acc->B / sum;
                 }
-        }
-        img_png_write_to_file(out, img_out_path);
 
+                img_destroy(src);
+                src = out;
+        }
+
+        img_png_write_to_file(out, img_out_path);
         img_destroy(out);
-        img_destroy(src);
 
         return 0;
 }
