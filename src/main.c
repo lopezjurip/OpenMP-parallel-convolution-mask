@@ -95,22 +95,24 @@ int main(int argc, char *argv[]) {
   for (pass = 0; pass < passes; pass++) {
     out = create_image(src->height, src->width);
 
+#pragma omp parallel for private(                                              \
+    row, col, acc, i, j, row_start, col_start, K_ij, I_ij)                     \
+        shared(pass, src, out, K, k_height, k_width, k_width_center,           \
+               k_height_center, k_width_radius, k_height_radius) collapse(2)
     for (row = 0; row < src->height; row++) {
       for (col = 0; col < src->width; col++) {
         acc = calloc(1, sizeof(Color));
 
         i = 0;
         for (row_start = row - k_width_radius;
-             row_start <= row + k_width_radius;
-             row_start++) {
+             row_start <= row + k_width_radius; row_start++) {
           j = 0;
           for (col_start = col - k_height_radius;
-               col_start <= col + k_height_radius;
-               col_start++) {
+               col_start <= col + k_height_radius; col_start++) {
             if (row_start < 0 || row_start >= src->width) {
-              continue;
+              // TODO: what to do with edges?
             } else if (col_start < 0 || col_start >= src->height) {
-              continue;
+              // TODO: what to do with edges?
             } else {
               K_ij = K[i][j];
               I_ij = src->pixels[row_start][col_start];
@@ -122,10 +124,9 @@ int main(int argc, char *argv[]) {
           }
           i += 1;
         }
-        size_t sum = 1; // k_width * k_height;
-        out->pixels[row][col].R = acc->R / sum;
-        out->pixels[row][col].G = acc->G / sum;
-        out->pixels[row][col].B = acc->B / sum;
+        out->pixels[row][col].R = acc->R;
+        out->pixels[row][col].G = acc->G;
+        out->pixels[row][col].B = acc->B;
         free(acc);
       }
     }
