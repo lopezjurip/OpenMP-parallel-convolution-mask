@@ -54,11 +54,6 @@ Image *create_image(size_t height, size_t width) {
   img->pixels = calloc(height, sizeof(Color *));
   for (size_t row = 0; row < height; row++) {
     img->pixels[row] = calloc(width, sizeof(Color));
-    for (size_t col = 0; col < width; col++) {
-      img->pixels[row][col].R = 0.0;
-      img->pixels[row][col].G = 0.0;
-      img->pixels[row][col].B = 0.0;
-    }
   }
   return img;
 }
@@ -88,7 +83,9 @@ int main(int argc, char *argv[]) {
   ssize_t row_start;
   size_t j;
   ssize_t col_start;
-  Color *acc = NULL;
+  float acc_R = 0.0;
+  float acc_G = 0.0;
+  float acc_B = 0.0;
   Color I_ij;
   float K_ij = 0;
 
@@ -96,38 +93,37 @@ int main(int argc, char *argv[]) {
     out = create_image(src->height, src->width);
 
 #pragma omp parallel for private(                                              \
-    row, col, acc, i, j, row_start, col_start, K_ij, I_ij)                     \
+    row, col, i, j, acc_R, acc_G, acc_B, row_start, col_start, K_ij, I_ij)     \
         shared(pass, src, out, K, k_height, k_width, k_width_center,           \
                k_height_center, k_width_radius, k_height_radius) collapse(2)
     for (row = 0; row < src->height; row++) {
       for (col = 0; col < src->width; col++) {
-        acc = calloc(1, sizeof(Color));
+        acc_R = acc_G = acc_B = 0.0;
 
         i = 0;
-        for (row_start = row - k_width_radius;
-             row_start <= row + k_width_radius; row_start++) {
+        for (row_start = row - k_height_radius;
+             row_start <= row + k_height_radius; row_start++) {
           j = 0;
-          for (col_start = col - k_height_radius;
-               col_start <= col + k_height_radius; col_start++) {
-            if (row_start < 0 || row_start >= src->width) {
+          for (col_start = col - k_width_radius;
+               col_start <= col + k_width_radius; col_start++) {
+            if (row_start < 0 || row_start >= src->height) {
               // TODO: what to do with edges?
-            } else if (col_start < 0 || col_start >= src->height) {
+            } else if (col_start < 0 || col_start >= src->width) {
               // TODO: what to do with edges?
             } else {
               K_ij = K[i][j];
               I_ij = src->pixels[row_start][col_start];
-              acc->R += K_ij * I_ij.R;
-              acc->G += K_ij * I_ij.G;
-              acc->B += K_ij * I_ij.B;
+              acc_R += K_ij * I_ij.R;
+              acc_G += K_ij * I_ij.G;
+              acc_B += K_ij * I_ij.B;
             }
             j += 1;
           }
           i += 1;
         }
-        out->pixels[row][col].R = acc->R;
-        out->pixels[row][col].G = acc->G;
-        out->pixels[row][col].B = acc->B;
-        free(acc);
+        out->pixels[row][col].R = acc_R;
+        out->pixels[row][col].G = acc_G;
+        out->pixels[row][col].B = acc_B;
       }
     }
 

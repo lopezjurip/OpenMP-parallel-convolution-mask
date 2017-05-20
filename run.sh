@@ -1,8 +1,8 @@
 # Compile
-make
+make -f Makefile
 
 # Image and param to use
-img_def='lena'
+img_def='big'
 kernel_def='blur'
 passes=10
 if [[ -z $1 ]]; then img_in="test/img_in/${img_def}.png"; else img_in=$1; fi
@@ -22,6 +22,11 @@ echo ''
 print 'Running parallel'
 time ./build/parallel $img_in $kernel $passes $img_out
 print 'Done parallel'
+echo ''
+
+print 'Running parallel (over-CPU)'
+time OMP_NUM_THREADS=10 ./build/parallel $img_in $kernel $passes $img_out
+print 'Done parallel over'
 echo ''
 
 echo 'Done!'
